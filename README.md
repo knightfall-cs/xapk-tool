@@ -46,11 +46,11 @@ pip install -r requirements.txt
 
 ## Notes
 
-- The tool expects a directory with a single apk and obb files.
+- The tool expects a directory with a single APK file and one or more OBB files.
 
-- There is no check to ensure that the OBB and APK are from the same application. There is also no check for cases where there is no obb file.
+- The XAPK creation process does not currently include checks to ensure that the APK and OBB files belong to the same application. Additionally, there is no handling for cases where there is no OBB file.
 
-- Probably should enforce that obb files are correctly named (`[main|patch].<expansion-version>.<package-name>.obb`), as per <https://developer.android.com/google/play/expansion-files#GettingFilenames>
+- It's recommended to follow the Android expansion file naming convention for OBB files: `[main|patch].<expansion-version>.<package-name>.obb` as described in the [Android documentation](https://developer.android.com/google/play/expansion-files#GettingFilenames).
 
 ## Authors
 
