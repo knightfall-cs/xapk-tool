@@ -70,7 +70,7 @@ This [XAPK Creation Tool V2](https://github.com/knightfall-cs/xapktool.git) is l
 
 ## Acknowledgments
 
-This [XAPK Creation Tool V2](https://github.com/knightfall-cs/xapktool.git) was inspired by the work of [BryghtShadow](https://github.com/BryghtShadow/xapktool). I would like to express my gratitude for the original project's contributions and ideas that inspired the development of this tool.
+The development of [XAPK Creation Tool V2](https://github.com/knightfall-cs/xapktool.git) was influenced by [BryghtShadow's xapktool](https://github.com/BryghtShadow/xapktool), which provided the groundwork for this project.
 
 ---
 
