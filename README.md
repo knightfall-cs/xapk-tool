@@ -36,7 +36,7 @@ To use the tool, follow these steps:
 
 - Automatically creates `icon.png` and `manifest.json` files from the APK.
 
-- Supports mutliplte OBB files.
+- Supports multiple OBB files.
 
 ## Installation
 
