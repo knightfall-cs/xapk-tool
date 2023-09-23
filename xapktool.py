@@ -1,9 +1,9 @@
 import os
 import sys
 import json
-import tempfile
 import shutil
 import zipfile
+import tempfile
 from pathlib import Path, PurePath
 from androguard.core.bytecodes.apk import APK
 
@@ -38,8 +38,8 @@ class XAPK:
             print("Verifying APK and OBB...")            
             apk_package_name = self.apk.get_package()
             for i, obb_file in enumerate(self.obb_files):
-                obb_package_names = ".".join([obb.stem.split(".")[2:] for obb in self.obb_files][i])
-                if apk_package_name != obb_package_names:
+                obb_package_name = ".".join([obb.stem.split(".")[2:] for obb in self.obb_files][i])
+                if obb_package_name != apk_package_name:
                     raise ValueError("The APK and OBB files do not belong to the same app.")
             print("Verification: OK")
             
