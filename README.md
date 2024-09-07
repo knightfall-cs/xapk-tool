@@ -45,14 +45,35 @@ Before using the XAPK creation tool, ensure you have [Python 3](https://www.pyth
 To install any necessary dependencies, run the following command in your terminal:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
+
+OR (only in linux):
+
+```bash
+sudo apt install adroguard
+```
+This installs all necessary dependencies with androguard.
 
 ## Notes
 
 - The tool expects a directory with a single APK file and one or more OBB files.
 
 - It's recommended to follow the Android expansion file naming convention for OBB files: `[main|patch].<expansion-version>.<package-name>.obb` as described in the [Android documentation](https://developer.android.com/google/play/expansion-files#GettingFilenames).
+
+- If you encounter a module error related to importing `APK` from `androguard.core.bytecodes.apk`, modify the import statement,
+
+From:
+
+```python
+from androguard.core.bytecodes.apk import APK
+```
+
+To:
+
+```python
+from androguard.core.apk import APK
+```
 
 ## Authors
 
