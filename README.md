@@ -61,7 +61,7 @@ This installs all necessary dependencies with androguard.
 
 - It's recommended to follow the Android expansion file naming convention for OBB files: `[main|patch].<expansion-version>.<package-name>.obb` as described in the [Android documentation](https://developer.android.com/google/play/expansion-files#GettingFilenames).
 
-- If you encounter a module error related to importing `APK` from `androguard.core.bytecodes.apk`, modify the import statement,
+- If you encounter a module error related to importing `APK` from `androguard.core.apk`, modify the import statement,
 
 From:
 
