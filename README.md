@@ -66,13 +66,13 @@ This installs all necessary dependencies with androguard.
 From:
 
 ```python
-from androguard.core.bytecodes.apk import APK
+from androguard.core.apk import APK
 ```
 
 To:
 
 ```python
-from androguard.core.apk import APK
+from androguard.core.bytecodes.apk import APK
 ```
 
 ## Authors
