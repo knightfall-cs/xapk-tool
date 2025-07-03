@@ -5,7 +5,7 @@ import shutil
 import zipfile
 import tempfile
 from pathlib import Path, PurePath
-from androguard.core.bytecodes.apk import APK
+from androguard.core.apk import APK
 
 class XAPK:
     def __init__(self, folder):
