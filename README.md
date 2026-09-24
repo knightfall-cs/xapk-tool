@@ -51,7 +51,7 @@ python -m pip install -r requirements.txt
 OR (only in linux):
 
 ```bash
-sudo apt install adroguard
+sudo apt install androguard
 ```
 This installs all necessary dependencies with androguard.
 
