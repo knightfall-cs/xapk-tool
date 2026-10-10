@@ -79,7 +79,7 @@ cd xapk-tool
 pipx install .
 ```
 
-Now you can invoke `xapktool` or `xapk-tool` directly from anywhere!
+Now you can invoke `xapktool` directly from anywhere!
 
 ---
 
