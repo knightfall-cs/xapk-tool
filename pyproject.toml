@@ -34,7 +34,6 @@ dependencies = [
 
 [project.scripts]
 xapktool = "xapktool:main"
-xapk-tool = "xapktool:main"
 
 [project.urls]
 Homepage = "https://github.com/knightfall-cs/xapk-tool"

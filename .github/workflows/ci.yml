@@ -35,7 +35,7 @@ jobs:
         run: |
           python -m py_compile xapktool.py
 
-      - name: Verify CLI commands
+      - name: Verify CLI command
         run: |
           xapktool --help
-          xapk-tool --version
+          xapktool --version

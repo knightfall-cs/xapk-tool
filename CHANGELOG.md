@@ -40,7 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Resilient Androguard Imports**:
   - Dynamically resolves both modern (`androguard.core.bytecodes.apk`) and legacy (`androguard.core.apk`) imports without requiring manual code modifications.
 - **Standard Python Packaging**:
-  - Added PEP 517/518/621 `pyproject.toml` exposing global `xapktool` and `xapk-tool` commands via `pip` / `pipx`.
+  - Added PEP 517/518/621 `pyproject.toml` exposing global `xapktool` command via `pip` / `pipx`.
   - Trimmed bloated `requirements.txt` from 28 packages to just `androguard>=3.4.0`.
 
 ---
