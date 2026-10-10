@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "xapk-tool"
+version = "2.1.0"
+description = "A modern CLI tool to create XAPK files from Android APK and OBB expansion files."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+    { name = "KNIGHTFALL" }
+]
+keywords = ["android", "apk", "obb", "xapk", "xapk-tool", "mobile"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Utilities",
+    "Topic :: Software Development :: Build Tools",
+]
+dependencies = [
+    "androguard>=3.4.0",
+]
+
+[project.scripts]
+xapktool = "xapktool:main"
+xapk-tool = "xapktool:main"
+
+[project.urls]
+Homepage = "https://github.com/knightfall-cs/xapk-tool"
+Repository = "https://github.com/knightfall-cs/xapk-tool.git"
+Issues = "https://github.com/knightfall-cs/xapk-tool/issues"
+
+[tool.setuptools]
+py-modules = ["xapktool"]

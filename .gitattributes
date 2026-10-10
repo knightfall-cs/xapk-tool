@@ -1,0 +1,20 @@
+# Set default behavior to automatically normalize line endings
+* text=auto
+
+# Explicitly declare text files you want to always be normalized and converted
+# to native line endings on checkout
+*.py text eol=lf
+*.md text
+*.toml text
+*.txt text
+*.json text
+*.yml text
+*.yaml text
+
+# Denote binary files that should never be modified by git
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.apk binary
+*.obb binary
+*.xapk binary
