@@ -116,10 +116,10 @@ python3 xapktool.py /path/to/folder
 ## Usage
 
 ```bash
-xapktool [OPTIONS] <directory>
+python3 xapktool.py [OPTIONS] <directory>
 ```
 
-*(Note: `xapk-tool` and `python3 xapktool.py` can be used interchangeably).*
+*(Note: `xapktool` and `python3 xapktool.py` can be used interchangeably).*
 
 ### Command Reference
 
