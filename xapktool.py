@@ -39,6 +39,7 @@ class XAPK:
         output: Optional[str | Path] = None,
         xapk_version: int = 2,
         skip_verify: bool = False,
+        no_obb: bool = False,
         allow_no_obb: bool = False,
         force: bool = False,
         verbose: bool = False,
@@ -54,7 +55,7 @@ class XAPK:
         self.output_param = Path(output) if output else None
         self.xapk_version = xapk_version
         self.skip_verify = skip_verify
-        self.allow_no_obb = allow_no_obb
+        self.no_obb = no_obb or allow_no_obb
         self.force = force
         self.verbose = verbose
         self.quiet = quiet
@@ -167,10 +168,10 @@ class XAPK:
 
         # Discover OBB files
         self.obb_files = sorted(self.folder.glob("*.obb"))
-        if not self.obb_files and not self.allow_no_obb:
+        if not self.obb_files and not self.no_obb:
             raise FileNotFoundError(
                 f"No OBB files found in '{self.folder}'. "
-                "If this APK does not require OBB expansions, run with --allow-no-obb."
+                "If this APK does not require OBB expansions, run with --no-obb."
             )
 
         # Parse APK metadata
@@ -450,7 +451,7 @@ Examples:
   xapktool /path/to/apk_folder -o /dist/folder --force
   xapktool /path/to/apk_folder --xapk-version 2
   xapktool /path/to/apk_folder --skip-verify
-  xapktool /path/to/apk_folder --allow-no-obb
+  xapktool /path/to/apk_folder --no-obb
 """,
     )
 
@@ -485,7 +486,9 @@ Examples:
         help="Skip strict package name verification of OBB files.",
     )
     parser.add_argument(
+        "--no-obb",
         "--allow-no-obb",
+        dest="no_obb",
         action="store_true",
         help="Allow packaging an APK without OBB expansion files.",
     )
@@ -522,7 +525,7 @@ def main(args: Optional[List[str]] = None) -> int:
             output=parsed_args.output,
             xapk_version=parsed_args.xapk_version,
             skip_verify=parsed_args.skip_verify,
-            allow_no_obb=parsed_args.allow_no_obb,
+            no_obb=parsed_args.no_obb,
             force=parsed_args.force,
             verbose=parsed_args.verbose,
             quiet=parsed_args.quiet,
