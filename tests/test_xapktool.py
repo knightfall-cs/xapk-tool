@@ -254,3 +254,50 @@ class TestIconFallbackAndOptions:
         ])
         assert exit_code == 0
         assert out_file.exists()
+
+    def test_obb_version_mismatch_fails(self, tmp_path):
+        """Test that OBB version must match APK version code unless --skip-verify is used."""
+        shutil.copy(REAL_STUPAX_DIR / "com.StupaX.Flight.apk", tmp_path / "com.StupaX.Flight.apk")
+        # StupaX APK version_code is 1; create OBB with version 99
+        mismatched_obb = tmp_path / "main.99.com.StupaX.Flight.obb"
+        mismatched_obb.write_bytes(b"dummy")
+
+        with pytest.raises(ValueError, match="expansion version .* does not match APK version code"):
+            XAPK(folder=tmp_path, quiet=True)
+
+        # --skip-verify allows it
+        tool = XAPK(folder=tmp_path, skip_verify=True, quiet=True)
+        assert len(tool.obb_expansions) == 1
+
+    def test_split_setup_skips_obb_requirement(self):
+        """Test that split APK setups do not require OBB files nor the --no-obb flag."""
+        tool = XAPK(folder=REAL_PINGZERO_DIR, quiet=True)
+        assert tool.obb_expansions == []
+        assert tool.manifest["xapk_version"] == 2
+
+    def test_split_setup_skips_obb_verification(self, tmp_path):
+        """Test that in a split APK setup, strict OBB verification is automatically skipped."""
+        # Copy split APKs
+        shutil.copy(REAL_PINGZERO_DIR / "com.pingzero.booster.apk", tmp_path / "com.pingzero.booster.apk")
+        shutil.copy(REAL_PINGZERO_DIR / "config.arm64_v8a.apk", tmp_path / "config.arm64_v8a.apk")
+        shutil.copy(REAL_PINGZERO_DIR / "config.mdpi.apk", tmp_path / "config.mdpi.apk")
+
+        # Create an OBB with a non-matching version
+        nonstandard_obb = tmp_path / "main.999.com.pingzero.booster.obb"
+        nonstandard_obb.write_bytes(b"dummy_expansion")
+
+        # In split APK setup, verification is skipped so this should succeed without error
+        tool = XAPK(folder=tmp_path, quiet=True)
+        assert len(tool.obb_expansions) == 1
+
+    def test_modern_manifest_rich_details(self):
+        """Test that v2 manifest gathers maximum metadata for 3rd party installers."""
+        tool = XAPK(folder=REAL_PINGZERO_DIR, quiet=True)
+        manifest = tool.manifest
+
+        assert manifest["main_activity"] == "com.pingzero.page.maintab.PingZeroMainActivity"
+        assert manifest["native_code"] == ["arm64-v8a"]
+        assert "org.apache.http.legacy" in manifest["libraries"]
+        assert len(manifest["locales_name"]) > 1  # preserved full locale mappings
+        assert "en" in manifest["locales_name"]
+        assert len(manifest["permissions"]) == 19

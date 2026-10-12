@@ -222,9 +222,15 @@ class XAPK:
 
         return base_apk, split_candidates, split_id_map
 
-    def _verify_and_collect_obbs(self, apk_package_name: str) -> List[OBBExpansion]:
-        """Validate OBB filenames against Android naming conventions and ensure no duplicates."""
+    def _verify_and_collect_obbs(
+        self,
+        apk_package_name: str,
+        apk_version_code: int,
+        skip_verification: bool = False,
+    ) -> List[OBBExpansion]:
+        """Validate OBB filenames against Android naming conventions and APK version code."""
         expansions: List[OBBExpansion] = []
+        bypass = self.skip_verify or skip_verification
 
         for obb_file in self.obb_files:
             match = OBB_REGEX.match(obb_file.name)
@@ -235,9 +241,9 @@ class XAPK:
                     f"OBB file '{obb_file.name}' does not follow Android naming convention: "
                     "[main|patch].<version-code>.<package-name>.obb."
                 )
-                if not self.skip_verify:
+                if not bypass:
                     raise ValueError(f"{err_msg} Use --skip-verify to bypass.")
-                self._log(f"Warning: {err_msg} (ignoring due to --skip-verify)")
+                self._log(f"Warning: {err_msg} (ignoring due to verification bypass)")
                 parts = obb_file.stem.split(".")
                 kind = "patch" if parts[0].lower() == "patch" else "main"
                 expansions.append(
@@ -252,41 +258,67 @@ class XAPK:
                 continue
 
             kind, version_str, obb_pkg = match.group(1), match.group(2), match.group(3)
-
-            if obb_pkg != apk_package_name:
-                err_msg = (
-                    f"OBB file '{obb_file.name}' package ('{obb_pkg}') does not match "
-                    f"APK package ('{apk_package_name}')."
-                )
-                if not self.skip_verify:
-                    raise ValueError(f"{err_msg} Use --skip-verify to bypass.")
-                self._log(f"Warning: {err_msg} (ignoring due to --skip-verify)")
+            obb_version = int(version_str)
 
             expansions.append(
                 OBBExpansion(
                     src=obb_file,
                     kind=kind,
-                    version=int(version_str),
+                    version=obb_version,
                     package=obb_pkg,
                     archive_path=archive_path,
                 )
             )
 
-        # Enforce at most one main and one patch OBB
-        main_obbs = [o for o in expansions if o.kind == "main"]
-        patch_obbs = [o for o in expansions if o.kind == "patch"]
+        # Enforce multiplicity, package, and version checks
+        if not bypass:
+            main_obbs = [o for o in expansions if o.kind == "main"]
+            patch_obbs = [o for o in expansions if o.kind == "patch"]
 
-        if len(main_obbs) > 1:
-            err_msg = f"Multiple main OBB files found: {[o.src.name for o in main_obbs]}. Android supports at most one main expansion."
-            if not self.skip_verify:
+            if len(main_obbs) > 1:
+                err_msg = (
+                    f"Multiple main OBB files found: {[o.src.name for o in main_obbs]}. "
+                    "Android supports at most one main expansion."
+                )
                 raise ValueError(f"{err_msg} Use --skip-verify to bypass.")
-            self._log(f"Warning: {err_msg} (ignoring due to --skip-verify)")
 
-        if len(patch_obbs) > 1:
-            err_msg = f"Multiple patch OBB files found: {[o.src.name for o in patch_obbs]}. Android supports at most one patch expansion."
-            if not self.skip_verify:
+            if len(patch_obbs) > 1:
+                err_msg = (
+                    f"Multiple patch OBB files found: {[o.src.name for o in patch_obbs]}. "
+                    "Android supports at most one patch expansion."
+                )
                 raise ValueError(f"{err_msg} Use --skip-verify to bypass.")
-            self._log(f"Warning: {err_msg} (ignoring due to --skip-verify)")
+
+            # Validate package name and expansion version for each expansion
+            for o in expansions:
+                if o.package != apk_package_name:
+                    err_msg = (
+                        f"OBB file '{o.src.name}' package ('{o.package}') does not match "
+                        f"APK package ('{apk_package_name}')."
+                    )
+                    raise ValueError(f"{err_msg} Use --skip-verify to bypass.")
+
+                if o.version != apk_version_code:
+                    err_msg = (
+                        f"OBB file '{o.src.name}' expansion version ({o.version}) does not match "
+                        f"APK version code ({apk_version_code})."
+                    )
+                    raise ValueError(
+                        f"{err_msg} Standard Android format requires matching version code. "
+                        "Use --skip-verify to bypass."
+                    )
+        else:
+            for o in expansions:
+                if o.package != apk_package_name:
+                    self._log(
+                        f"Warning: OBB file '{o.src.name}' package ('{o.package}') does not match "
+                        f"APK package ('{apk_package_name}') (ignoring due to verification bypass)"
+                    )
+                if o.version != apk_version_code:
+                    self._log(
+                        f"Warning: OBB file '{o.src.name}' expansion version ({o.version}) does not match "
+                        f"APK version code ({apk_version_code}) (ignoring due to verification bypass)"
+                    )
 
         return expansions
 
@@ -331,7 +363,10 @@ class XAPK:
 
         # Discover OBB files
         self.obb_files = sorted(self.folder.glob("*.obb"))
-        if not self.obb_files and not self.no_obb:
+        is_split_setup = bool(self.split_apks)
+
+        # In a split APK setup, OBB expansion files are optional by default
+        if not self.obb_files and not self.no_obb and not is_split_setup:
             raise FileNotFoundError(
                 f"No OBB files found in '{self.folder}'. "
                 "If this APK does not require OBB expansions, run with --no-obb."
@@ -346,6 +381,17 @@ class XAPK:
             raise ValueError("Unable to determine package name from APK.")
         self._debug(f"APK Package: {apk_package_name}")
 
+        # Validate APK version code
+        raw_version_code = self.apk.get_androidversion_code()
+        try:
+            apk_version_code = int(raw_version_code)
+            if apk_version_code < 0:
+                raise ValueError(f"Negative version code: {apk_version_code}")
+        except (ValueError, TypeError):
+            raise ValueError(
+                f"Invalid or missing Android version_code ({raw_version_code!r}) in APK '{self.apk_src.name}'."
+            )
+
         # Enforce XAPK specification constraints
         if self.xapk_version == 1 and self.split_apks:
             raise ValueError(
@@ -353,10 +399,17 @@ class XAPK:
                 "Please use '--xapk-version 2' to package split APKs."
             )
 
-        # Verify and collect OBBs
+        # Verify and collect OBBs (skip verification if it's a split APK setup)
         if self.obb_files:
-            self._debug("Verifying OBB files...")
-            self.obb_expansions = self._verify_and_collect_obbs(apk_package_name)
+            if is_split_setup:
+                self._debug("Split APK setup detected: skipping strict OBB verification.")
+            else:
+                self._debug("Verifying OBB files against APK package and version code...")
+            self.obb_expansions = self._verify_and_collect_obbs(
+                apk_package_name=apk_package_name,
+                apk_version_code=apk_version_code,
+                skip_verification=is_split_setup,
+            )
         else:
             self.obb_expansions = []
 
@@ -416,7 +469,7 @@ class XAPK:
         version_name = self.apk.get_androidversion_name() or "1.0"
         min_sdk = self._safe_int_or_str(self.apk.get_min_sdk_version())
         target_sdk = self._safe_int_or_str(self.apk.get_target_sdk_version())
-        permissions = list(self.apk.get_permissions() or [])
+        permissions = sorted(list(set(str(p) for p in (self.apk.get_permissions() or []) if p)))
 
         # Total uncompressed payload size (APKs and OBBs)
         total_size = self.apk_src.stat().st_size
@@ -454,6 +507,18 @@ class XAPK:
             return manifest
 
         # Modern v2 manifest profile
+        # Preserve full multi-locale dictionary if present in existing manifest.json
+        locales_name: Dict[str, str] = {"en": str(app_name)}
+        local_manifest_file = self.folder / "manifest.json"
+        if local_manifest_file.is_file():
+            try:
+                with open(local_manifest_file, "r", encoding="utf-8") as f:
+                    old_manifest = json.load(f)
+                    if isinstance(old_manifest.get("locales_name"), dict):
+                        locales_name = {str(k): str(v) for k, v in old_manifest["locales_name"].items()}
+            except Exception:
+                pass
+
         split_apks_info = [
             {
                 "file": f"{package_name}.apk",
@@ -473,9 +538,7 @@ class XAPK:
             "xapk_version": 2,
             "package_name": package_name,
             "name": str(app_name),
-            "locales_name": {
-                "en": str(app_name)
-            },
+            "locales_name": locales_name,
             "version_code": str(version_code),
             "version_name": str(version_name),
             "min_sdk_version": str(min_sdk) if min_sdk is not None else None,
@@ -485,6 +548,61 @@ class XAPK:
             "icon": "icon.png",
             "split_apks": split_apks_info,
         }
+
+        # Optional Max SDK
+        try:
+            max_sdk = self.apk.get_max_sdk_version()
+            if max_sdk is not None:
+                manifest["max_sdk_version"] = str(self._safe_int_or_str(max_sdk))
+        except Exception:
+            pass
+
+        # Main launcher activity (critical for 3rd-party installers to launch app)
+        try:
+            main_activity = self.apk.get_main_activity()
+            if main_activity:
+                manifest["main_activity"] = str(main_activity)
+        except Exception:
+            pass
+
+        # Native ABIs / Architecture
+        native_abis = self._detect_native_code()
+        if native_abis:
+            manifest["native_code"] = native_abis
+
+        # Hardware/software features (<uses-feature>)
+        try:
+            raw_features = self.apk.get_features()
+            if raw_features:
+                feats = sorted(list(set(str(f) for f in raw_features if f)))
+                if feats:
+                    manifest["features"] = feats
+        except Exception:
+            pass
+
+        # Shared libraries (<uses-library>)
+        try:
+            raw_libs = self.apk.get_libraries()
+            if raw_libs:
+                libs = sorted(list(set(str(l) for l in raw_libs if l)))
+                if libs:
+                    manifest["libraries"] = libs
+        except Exception:
+            pass
+
+        # Leanback / Android TV detection
+        try:
+            if self.apk.is_leanback() or self.apk.is_androidtv():
+                manifest["is_leanback"] = True
+        except Exception:
+            pass
+
+        # Wearable / Wear OS detection
+        try:
+            if self.apk.is_wearable():
+                manifest["is_wearable"] = True
+        except Exception:
+            pass
 
         if split_configs:
             manifest["split_configs"] = split_configs
