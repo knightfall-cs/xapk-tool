@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-__version__ = "2.1.0"
+__version__ = "2.1.1"
 
 # Suppress internal androguard permission resource mapping logs
 logging.getLogger("androguard").setLevel(logging.ERROR)

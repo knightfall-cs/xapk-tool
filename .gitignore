@@ -43,6 +43,8 @@ htmlcov/
 .tox/
 .nox/
 .hypothesis/
+test/
+tests/
 
 # Linting & Type Checking
 .mypy_cache/
