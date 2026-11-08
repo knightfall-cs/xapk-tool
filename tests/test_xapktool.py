@@ -13,6 +13,20 @@ from xapktool import OBB_REGEX, XAPK, main
 REAL_STUPAX_DIR = Path("/home/knight/GIT/com.StupaX.Flight")
 REAL_PINGZERO_DIR = Path("/home/knight/GIT/com.pingzero.booster_was_XAPK")
 
+# Skip markers — tests that need real on-disk APK fixtures
+requires_stupax = pytest.mark.skipif(
+    not REAL_STUPAX_DIR.is_dir(),
+    reason=f"Real fixture not present: {REAL_STUPAX_DIR}",
+)
+requires_pingzero = pytest.mark.skipif(
+    not REAL_PINGZERO_DIR.is_dir(),
+    reason=f"Real fixture not present: {REAL_PINGZERO_DIR}",
+)
+requires_both = pytest.mark.skipif(
+    not (REAL_STUPAX_DIR.is_dir() and REAL_PINGZERO_DIR.is_dir()),
+    reason="Both real fixtures required",
+)
+
 
 class TestOBBRegex:
     """Validate strict Android OBB filename matching rules."""
@@ -50,6 +64,7 @@ class TestOBBRegex:
 class TestRealFixtures:
     """Tests executing against real-world APK/OBB fixtures."""
 
+    @requires_stupax
     def test_stupax_flight_v1_legacy(self, tmp_path):
         """Test Matrix A & B: Legacy v1 profile with single APK and main + patch OBBs."""
         out_file = tmp_path / "stupax_v1.xapk"
@@ -87,6 +102,7 @@ class TestRealFixtures:
             assert "icon.png" in names
             assert "manifest.json" in names
 
+    @requires_stupax
     def test_stupax_flight_v2_modern(self, tmp_path):
         """Test Matrix A & B in modern v2 mode."""
         out_file = tmp_path / "stupax_v2.xapk"
@@ -105,6 +121,7 @@ class TestRealFixtures:
         assert manifest["split_apks"] == [{"file": "com.StupaX.Flight.apk", "id": "base"}]
         assert len(manifest["expansions"]) == 2
 
+    @requires_pingzero
     def test_pingzero_booster_v2_split_set(self, tmp_path):
         """Test Matrix G: Modern v2 profile with base APK + 2 split APKs."""
         out_file = tmp_path / "pingzero_v2.xapk"
@@ -138,6 +155,7 @@ class TestRealFixtures:
             assert "icon.png" in names
             assert "manifest.json" in names
 
+    @requires_pingzero
     def test_pingzero_v1_rejects_splits(self, tmp_path):
         """Test Matrix J: XAPK v1 must reject split APKs."""
         out_file = tmp_path / "pingzero_v1.xapk"
@@ -154,6 +172,7 @@ class TestRealFixtures:
 class TestOBBValidationEdgeCases:
     """Synthetic tests for OBB edge cases, invalid names, and duplicates."""
 
+    @requires_stupax
     def test_mismatched_package_fails(self, tmp_path):
         """Test Matrix C: OBB with wrong package fails."""
         # Copy real APK
@@ -169,6 +188,7 @@ class TestOBBValidationEdgeCases:
         tool = XAPK(folder=tmp_path, skip_verify=True, quiet=True)
         assert len(tool.obb_expansions) == 1
 
+    @requires_stupax
     def test_invalid_obb_naming_fails(self, tmp_path):
         """Test Matrix D: Non-standard OBB naming fails."""
         shutil.copy(REAL_STUPAX_DIR / "com.StupaX.Flight.apk", tmp_path / "com.StupaX.Flight.apk")
@@ -178,6 +198,7 @@ class TestOBBValidationEdgeCases:
         with pytest.raises(ValueError, match="does not follow Android naming convention"):
             XAPK(folder=tmp_path, quiet=True)
 
+    @requires_stupax
     def test_duplicate_main_obb_fails(self, tmp_path):
         """Test Matrix E: Multiple main OBBs fail."""
         shutil.copy(REAL_STUPAX_DIR / "com.StupaX.Flight.apk", tmp_path / "com.StupaX.Flight.apk")
@@ -187,6 +208,7 @@ class TestOBBValidationEdgeCases:
         with pytest.raises(ValueError, match="Multiple main OBB files found"):
             XAPK(folder=tmp_path, quiet=True)
 
+    @requires_stupax
     def test_duplicate_patch_obb_fails(self, tmp_path):
         """Test Matrix E: Multiple patch OBBs fail."""
         shutil.copy(REAL_STUPAX_DIR / "com.StupaX.Flight.apk", tmp_path / "com.StupaX.Flight.apk")
@@ -200,6 +222,7 @@ class TestOBBValidationEdgeCases:
 class TestSplitAPKValidationEdgeCases:
     """Synthetic tests for split APK set coherence."""
 
+    @requires_both
     def test_mismatched_packages_fail(self, tmp_path):
         """Test Matrix H: Different packages in the same folder fail."""
         shutil.copy(REAL_STUPAX_DIR / "com.StupaX.Flight.apk", tmp_path / "com.StupaX.Flight.apk")
@@ -208,6 +231,7 @@ class TestSplitAPKValidationEdgeCases:
         with pytest.raises(ValueError, match="Incoherent APK set: multiple package names detected"):
             XAPK(folder=tmp_path, no_obb=True, quiet=True)
 
+    @requires_pingzero
     def test_no_base_apk_fails(self, tmp_path):
         """Test Matrix H: Only split configuration APKs present without base fails."""
         shutil.copy(REAL_PINGZERO_DIR / "config.arm64_v8a.apk", tmp_path / "config.arm64_v8a.apk")
@@ -220,6 +244,7 @@ class TestSplitAPKValidationEdgeCases:
 class TestIconFallbackAndOptions:
     """Tests for fallback icon, --no-obb, and overwrite behaviors."""
 
+    @requires_stupax
     def test_no_obb_flag(self, tmp_path):
         """Test Matrix K: Without --no-obb fails; with --no-obb succeeds."""
         shutil.copy(REAL_STUPAX_DIR / "com.StupaX.Flight.apk", tmp_path / "com.StupaX.Flight.apk")
@@ -230,6 +255,7 @@ class TestIconFallbackAndOptions:
         tool = XAPK(folder=tmp_path, no_obb=True, quiet=True)
         assert tool.obb_expansions == []
 
+    @requires_stupax
     def test_force_overwrite(self, tmp_path):
         """Test Matrix L: Collision without --force fails; with --force succeeds."""
         out_file = tmp_path / "target.xapk"
@@ -243,6 +269,7 @@ class TestIconFallbackAndOptions:
         tool.save()
         assert out_file.stat().st_size > 1000
 
+    @requires_stupax
     def test_cli_main_success(self, tmp_path):
         """Test CLI main() entrypoint."""
         out_file = tmp_path / "cli_test.xapk"
@@ -255,6 +282,7 @@ class TestIconFallbackAndOptions:
         assert exit_code == 0
         assert out_file.exists()
 
+    @requires_stupax
     def test_obb_version_mismatch_fails(self, tmp_path):
         """Test that OBB version must match APK version code unless --skip-verify is used."""
         shutil.copy(REAL_STUPAX_DIR / "com.StupaX.Flight.apk", tmp_path / "com.StupaX.Flight.apk")
@@ -269,12 +297,14 @@ class TestIconFallbackAndOptions:
         tool = XAPK(folder=tmp_path, skip_verify=True, quiet=True)
         assert len(tool.obb_expansions) == 1
 
+    @requires_pingzero
     def test_split_setup_skips_obb_requirement(self):
         """Test that split APK setups do not require OBB files nor the --no-obb flag."""
         tool = XAPK(folder=REAL_PINGZERO_DIR, quiet=True)
         assert tool.obb_expansions == []
         assert tool.manifest["xapk_version"] == 2
 
+    @requires_pingzero
     def test_split_setup_skips_obb_verification(self, tmp_path):
         """Test that in a split APK setup, strict OBB verification is automatically skipped."""
         # Copy split APKs
@@ -290,6 +320,7 @@ class TestIconFallbackAndOptions:
         tool = XAPK(folder=tmp_path, quiet=True)
         assert len(tool.obb_expansions) == 1
 
+    @requires_pingzero
     def test_modern_manifest_rich_details(self):
         """Test that v2 manifest gathers maximum metadata for 3rd party installers."""
         tool = XAPK(folder=REAL_PINGZERO_DIR, quiet=True)

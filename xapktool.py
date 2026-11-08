@@ -47,6 +47,25 @@ FALLBACK_ICON_PNG = (
 # Android OBB naming convention regex: [main|patch].<version-code>.<package-name>.obb
 OBB_REGEX = re.compile(r"^(main|patch)\.([0-9]+)\.([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)\.obb$")
 
+# PNG magic bytes — first 8 bytes of every valid PNG file
+_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+
+# mipmap density folders in descending resolution preference
+_MIPMAP_DENSITY_ORDER = [
+    "mipmap-xxxhdpi",
+    "mipmap-xxhdpi",
+    "mipmap-xhdpi",
+    "mipmap-hdpi",
+    "mipmap-mdpi",
+    "mipmap-ldpi",
+    "mipmap",
+]
+
+
+def _is_valid_png(data: Optional[bytes]) -> bool:
+    """Return True if *data* starts with the PNG magic signature."""
+    return bool(data and len(data) >= 8 and data[:8] == _PNG_MAGIC)
+
 
 @dataclass
 class OBBExpansion:
@@ -413,32 +432,102 @@ class XAPK:
         else:
             self.obb_expansions = []
 
-        # Resolve app icon (prefer local icon.png, fallback to APK, then to transparent 1x1 PNG)
-        local_icon = self.folder / "icon.png"
-        if local_icon.is_file():
-            try:
-                self.icon = local_icon.read_bytes()
-                self._debug(f"Loaded existing icon.png from directory ({len(self.icon)} bytes)")
-            except Exception:
-                self.icon = None
-
-        if not self.icon:
-            try:
-                icon_path = self.apk.get_app_icon()
-                if icon_path:
-                    self.icon = self.apk.get_file(icon_path)
-                    self._debug(f"Extracted icon from APK '{icon_path}' ({len(self.icon) if self.icon else 0} bytes)")
-            except Exception as e:
-                self._debug(f"Could not extract APK icon: {e}")
-                self.icon = None
-
-        if not self.icon:
+        # Resolve app icon using robust multi-stage extraction
+        self.icon = self._extract_icon()
+        if not _is_valid_png(self.icon):
             self.icon = FALLBACK_ICON_PNG
             self._debug("Using fallback 1x1 transparent PNG icon")
 
         # Build manifest
         self.manifest = self.make_manifest()
         self._log("Verification: OK")
+
+    def _extract_icon(self) -> Optional[bytes]:
+        """Extract the app icon as valid PNG bytes using a multi-stage strategy.
+
+        Stage 1: Local ``icon.png`` in the source directory — only if it passes
+                 the PNG magic-byte check (adaptive-icon XML files are skipped).
+        Stage 2: ``APK.get_app_icon()`` via androguard — again validated; the
+                 path returned for adaptive icons points to an XML file, which
+                 would produce non-PNG bytes.
+        Stage 3: Direct ZIP scan of the base APK for the highest-density PNG in
+                 mipmap folders (xxxhdpi → xxhdpi → xhdpi → hdpi → mdpi → ldpi).
+                 This is the reliable fallback when androguard returns an XML path.
+
+        Returns valid PNG bytes, or ``None`` if nothing could be found.
+        """
+        # Stage 1: local icon.png
+        local_icon = self.folder / "icon.png"
+        if local_icon.is_file():
+            try:
+                data = local_icon.read_bytes()
+                if _is_valid_png(data):
+                    self._debug(f"Loaded valid icon.png from directory ({len(data)} bytes)")
+                    return data
+                else:
+                    self._debug(
+                        f"Skipped local icon.png: not a valid PNG "
+                        f"(got {data[:4].hex() if data else 'empty'}) — likely Android binary XML"
+                    )
+            except Exception as e:
+                self._debug(f"Could not read local icon.png: {e}")
+
+        # Stage 2: androguard get_app_icon()
+        if self.apk:
+            try:
+                icon_path = self.apk.get_app_icon()
+                if icon_path:
+                    data = self.apk.get_file(icon_path)
+                    if _is_valid_png(data):
+                        self._debug(f"Extracted icon from APK via androguard '{icon_path}' ({len(data)} bytes)")
+                        return data
+                    else:
+                        self._debug(
+                            f"androguard icon path '{icon_path}' is not a PNG "
+                            f"(adaptive icon XML?) — falling back to mipmap scan"
+                        )
+            except Exception as e:
+                self._debug(f"androguard get_app_icon() failed: {e}")
+
+        # Stage 3: direct mipmap PNG scan inside the APK zip
+        if self.apk_src:
+            try:
+                with zipfile.ZipFile(self.apk_src, "r") as zf:
+                    names = zf.namelist()
+                    # Build a lookup: density_folder -> list of PNG paths
+                    density_pngs: Dict[str, List[str]] = {}
+                    for name in names:
+                        lower = name.lower()
+                        if not lower.endswith(".png"):
+                            continue
+                        # Match any res/mipmap-*/  or res/mipmap/  folder
+                        parts = lower.replace("\\", "/").split("/")
+                        for part in parts:
+                            if part.startswith("mipmap"):
+                                density_pngs.setdefault(part, []).append(name)
+                                break
+
+                    # Try densities in preferred order (prefix match to handle -v4 API qualifiers,
+                    # e.g. "mipmap-xxxhdpi" matches "mipmap-xxxhdpi-v4")
+                    for density in _MIPMAP_DENSITY_ORDER:
+                        # Collect all recorded folder keys that start with this density prefix
+                        matched_keys = [k for k in density_pngs if k == density or k.startswith(density + "-")]
+                        for key in matched_keys:
+                            for candidate in density_pngs[key]:
+                                try:
+                                    data = zf.read(candidate)
+                                    if _is_valid_png(data):
+                                        self._debug(
+                                            f"Extracted icon from APK zip '{candidate}' "
+                                            f"({len(data)} bytes) via mipmap scan"
+                                        )
+                                        return data
+                                except Exception:
+                                    continue
+            except Exception as e:
+                self._debug(f"Mipmap scan failed: {e}")
+
+        return None
 
     def make_manifest(self) -> Dict[str, Any]:
         """Construct the XAPK manifest dictionary according to the targeted specification profile."""
